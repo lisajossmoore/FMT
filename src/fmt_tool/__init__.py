@@ -1,7 +1,13 @@
 """Foundation Matching Tool package."""
 
 from .errors import FMTError, FMTValidationError
-from .models import FacultyRecord, FoundationRecord, IngestionResult, RunContext
+from .models import (
+    FacultyRecord,
+    FoundationRecord,
+    IngestionResult,
+    MatchResult,
+    RunContext,
+)
 
 __all__ = [
     "FMTError",
@@ -9,5 +15,6 @@ __all__ = [
     "FacultyRecord",
     "FoundationRecord",
     "IngestionResult",
+    "MatchResult",
     "RunContext",
 ]

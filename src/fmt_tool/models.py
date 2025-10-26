@@ -54,3 +54,15 @@ class RunContext:
     faculty_source: Path
     foundation_source: Path
     warnings: Sequence[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class MatchResult:
+    """Represents a scored match between a faculty member and a foundation."""
+
+    faculty: FacultyRecord
+    foundation: FoundationRecord
+    score: int
+    matched_keywords: List[str]
+    faculty_keyword_count: int
+    foundation_keyword_count: int
