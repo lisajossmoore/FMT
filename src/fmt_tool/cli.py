@@ -71,7 +71,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
 
     try:
-        output_path = pipeline.run(args)
+        output_path, summary = pipeline.run(args)
     except errors.FMTError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
@@ -80,6 +80,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     print(f"Digest created at {output_path}")
+    print(
+        f"Faculty processed: {summary.total_faculty} | Foundations checked: {summary.total_foundations} | Matches: {summary.total_matches}"
+    )
+    if summary.warnings:
+        print("Warnings:")
+        for warning in summary.warnings:
+            print(f"  - {warning}")
+    else:
+        print("Warnings: none")
     return 0
 
 

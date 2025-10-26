@@ -66,3 +66,13 @@ class MatchResult:
     matched_keywords: List[str]
     faculty_keyword_count: int
     foundation_keyword_count: int
+
+
+@dataclass(slots=True)
+class PipelineSummary:
+    """Aggregate information about a completed pipeline run."""
+
+    total_faculty: int
+    total_foundations: int
+    total_matches: int
+    warnings: List[str] = field(default_factory=list)

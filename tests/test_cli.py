@@ -8,8 +8,7 @@ SRC_DIR = ROOT_DIR / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from fmt_tool import cli  # noqa: E402
-from fmt_tool import errors  # noqa: E402
+from fmt_tool import cli, errors, models  # noqa: E402
 
 
 def test_parser_requires_mandatory_arguments():
@@ -40,7 +39,15 @@ def test_main_invokes_pipeline_with_defaults(monkeypatch, tmp_path):
 
     def fake_run(args):
         called["args"] = args
-        return tmp_path / "neonatology.xlsx"
+        return (
+            tmp_path / "neonatology.xlsx",
+            models.PipelineSummary(
+                total_faculty=2,
+                total_foundations=3,
+                total_matches=5,
+                warnings=[],
+            ),
+        )
 
     monkeypatch.setattr(cli.pipeline, "run", fake_run)
 
