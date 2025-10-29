@@ -18,6 +18,7 @@ class FacultyRecord:
     division: str
     career_stage: str
     keywords: Set[str]
+    keywords_phrases: List[str]
     raw_row_index: int
 
 
@@ -33,6 +34,7 @@ class FoundationRecord:
     institution_preferences: str
     website: str
     keywords: Set[str]
+    keywords_phrases: List[str]
     raw_row_index: int
 
 
@@ -53,6 +55,8 @@ class RunContext:
     run_label: str | None
     faculty_source: Path
     foundation_source: Path
+    output_path: Path
+    weighted_mode: bool
     warnings: Sequence[str] = field(default_factory=list)
 
 
@@ -63,9 +67,14 @@ class MatchResult:
     faculty: FacultyRecord
     foundation: FoundationRecord
     score: int
+    raw_score: float
+    keyword_score: int
+    weighted_score: int | None
     matched_keywords: List[str]
     faculty_keyword_count: int
     foundation_keyword_count: int
+    keyword_match_count: int
+    match_reason: str
 
 
 @dataclass(slots=True)
@@ -75,4 +84,5 @@ class PipelineSummary:
     total_faculty: int
     total_foundations: int
     total_matches: int
+    weighted_mode: bool
     warnings: List[str] = field(default_factory=list)

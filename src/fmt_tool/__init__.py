@@ -6,8 +6,10 @@ from .models import (
     FoundationRecord,
     IngestionResult,
     MatchResult,
+    PipelineSummary,
     RunContext,
 )
+from . import render, verification  # noqa: F401
 
 __all__ = [
     "FMTError",
@@ -16,5 +18,8 @@ __all__ = [
     "FoundationRecord",
     "IngestionResult",
     "MatchResult",
+    "PipelineSummary",
     "RunContext",
+    "render",
+    "verification",
 ]

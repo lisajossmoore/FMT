@@ -50,12 +50,14 @@ def test_load_faculty_success(tmp_path):
     first = result.records[0]
     assert first.name == "Jane Doe"
     assert first.division == "Neonatology"
-    assert first.keywords == {"neonatology", "lung", "pulmonary"}
+    assert {"neonatology", "lung", "pulmonary"} <= first.keywords
+    assert first.keywords_phrases == ["lung", "neonatology", "pulmonary"]
     assert first.raw_row_index == 2
 
     second = result.records[1]
     assert second.name == "John Smith"
-    assert second.keywords == {"neonatal intensive care", "bpd"}
+    assert second.keywords_phrases == ["bpd", "neonatal intensive care"]
+    assert "intensive" in second.keywords
     assert second.raw_row_index == 3
 
 
@@ -165,7 +167,8 @@ def test_load_foundations_success(tmp_path):
 
     record = result.records[0]
     assert record.name == "Pulmonary Fund"
-    assert record.keywords == {"pulmonary", "neonatology"}
+    assert {"pulmonary", "neonatology"} <= record.keywords
+    assert record.keywords_phrases == ["neonatology", "pulmonary"]
     assert record.raw_row_index == 2
 
 
@@ -212,3 +215,27 @@ def test_load_foundations_warns_on_missing_keywords(tmp_path):
     assert len(result.records) == 1
     assert result.records[0].keywords == set()
     assert any("missing keywords" in warning.lower() for warning in result.warnings)
+
+
+def test_load_faculty_filters_stopwords(tmp_path):
+    df = pd.DataFrame(
+        [
+            {
+                "Name": "Dr. Generic",
+                "Degree": "MD",
+                "Rank": "Professor",
+                "Division ": "Neonatology",
+                "Career Stage": "Mid",
+                "Keywords": "Career, Development, Pulmonary",
+            }
+        ]
+    )
+    path = write_excel(tmp_path, "faculty.xlsx", df)
+
+    result = ingest.load_faculty(
+        path,
+        ignored_tokens={"career", "development"},
+    )
+
+    assert len(result.records) == 1
+    assert result.records[0].keywords == {"pulmonary"}

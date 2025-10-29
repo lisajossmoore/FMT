@@ -32,6 +32,7 @@ def test_help_lists_expected_options(capsys):
     assert "--foundations-xlsx" in help_out
     assert "--output-xlsx" in help_out
     assert "--operator" in help_out
+    assert "--use-weights" in help_out
 
 
 def test_main_invokes_pipeline_with_defaults(monkeypatch, tmp_path):
@@ -45,6 +46,7 @@ def test_main_invokes_pipeline_with_defaults(monkeypatch, tmp_path):
                 total_faculty=2,
                 total_foundations=3,
                 total_matches=5,
+                weighted_mode=False,
                 warnings=[],
             ),
         )
@@ -70,6 +72,7 @@ def test_main_invokes_pipeline_with_defaults(monkeypatch, tmp_path):
     assert args.operator == "Unknown"
     assert args.run_label is None
     assert args.run_date is None
+    assert args.use_weights is None
 
 
 def test_main_handles_fmt_error(monkeypatch, capsys):
@@ -115,3 +118,35 @@ def test_main_handles_unexpected_exception(monkeypatch, capsys):
     captured = capsys.readouterr()
     assert "unexpected error" in captured.err.lower()
     assert "boom" in captured.err.lower()
+
+
+def test_main_prints_weighted_message(monkeypatch, capsys, tmp_path):
+    def fake_run(args):
+        return (
+            tmp_path / "neonatology.xlsx",
+            models.PipelineSummary(
+                total_faculty=1,
+                total_foundations=1,
+                total_matches=1,
+                weighted_mode=True,
+                warnings=[],
+            ),
+        )
+
+    monkeypatch.setattr(cli.pipeline, "run", fake_run)
+
+    exit_code = cli.main(
+        [
+            "--faculty-xlsx",
+            "faculty.xlsx",
+            "--foundations-xlsx",
+            "foundations.xlsx",
+            "--output-xlsx",
+            "output.xlsx",
+            "--use-weights",
+        ]
+    )
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "[v2.2] Weighted mode active" in output

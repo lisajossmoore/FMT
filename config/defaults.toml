@@ -1,0 +1,34 @@
+[matching]
+similarity_threshold = 0.6
+use_weights = false
+keyword_weight = 0.6
+grant_weight = 0.2
+stage_weight = 0.2
+ignored_tokens = [
+  "and",
+  "in",
+  "of",
+  "the",
+  "a",
+  "an",
+  "medicine",
+  "medical",
+  "disease",
+  "career",
+  "development",
+  "prevention",
+  "program",
+  "support",
+  "care",
+  "early",
+  "research",
+  "fund",
+  "foundation",
+  "grant",
+  "mission",
+  "goal",
+  "initiative",
+  "neonatal"
+]
+
+[matching.synonyms]

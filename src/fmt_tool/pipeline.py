@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from argparse import Namespace
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable, List, Tuple
 
 from .errors import FMTValidationError
+from . import config as config_module
 from . import ingest, match, render
 from .models import PipelineSummary, RunContext
 
@@ -17,8 +19,25 @@ def run(args: Namespace) -> Tuple[Path, PipelineSummary]:
 
     warnings: List[str] = []
 
-    faculty_result = ingest.load_faculty(Path(args.faculty_xlsx))
-    foundation_result = ingest.load_foundations(Path(args.foundations_xlsx))
+    matching_config = config_module.load_matching_config()
+    cli_use_weights = getattr(args, "use_weights", None)
+    if cli_use_weights is not None:
+        matching_config = replace(matching_config, use_weights=cli_use_weights)
+
+    faculty_path = Path(args.faculty_xlsx)
+    foundation_path = Path(args.foundations_xlsx)
+    output_path = Path(args.output_xlsx)
+
+    faculty_result = ingest.load_faculty(
+        faculty_path,
+        synonyms=matching_config.synonyms,
+        ignored_tokens=matching_config.ignored_tokens,
+    )
+    foundation_result = ingest.load_foundations(
+        foundation_path,
+        synonyms=matching_config.synonyms,
+        ignored_tokens=matching_config.ignored_tokens,
+    )
 
     warnings.extend(faculty_result.warnings)
     warnings.extend(foundation_result.warnings)
@@ -28,6 +47,7 @@ def run(args: Namespace) -> Tuple[Path, PipelineSummary]:
         foundation_result.records,
         warnings=warnings,
         profile="standard",
+        matching_config=matching_config,
     )
 
     matches_by_division = render.group_matches_by_division(matches)
@@ -39,19 +59,21 @@ def run(args: Namespace) -> Tuple[Path, PipelineSummary]:
         timestamp=run_timestamp,
         operator=args.operator,
         run_label=args.run_label,
-        faculty_source=Path(args.faculty_xlsx),
-        foundation_source=Path(args.foundations_xlsx),
+        faculty_source=faculty_path,
+        foundation_source=foundation_path,
+        output_path=output_path,
+        weighted_mode=matching_config.use_weights,
         warnings=deduped_warnings,
     )
 
     workbook = render.build_workbook(matches_by_division, run_context)
-    output_path = Path(args.output_xlsx)
     render.write_workbook(workbook, output_path)
 
     summary = PipelineSummary(
         total_faculty=len(faculty_result.records),
         total_foundations=len(foundation_result.records),
         total_matches=len(matches),
+        weighted_mode=matching_config.use_weights,
         warnings=deduped_warnings,
     )
 

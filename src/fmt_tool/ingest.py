@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Iterable, List, Tuple
 
@@ -31,7 +32,12 @@ FOUNDATION_REQUIRED_COLUMNS = [
 ]
 
 
-def load_faculty(path: Path) -> IngestionResult:
+def load_faculty(
+    path: Path,
+    *,
+    synonyms: dict[str, list[str]] | None = None,
+    ignored_tokens: Iterable[str] | None = None,
+) -> IngestionResult:
     """Load and validate faculty spreadsheet."""
 
     dataframe = _read_excel(path)
@@ -41,21 +47,29 @@ def load_faculty(path: Path) -> IngestionResult:
 
     records: List[FacultyRecord] = []
     warnings: List[str] = []
+    synonyms = _normalize_synonyms(synonyms)
+    ignored_set = {token.lower() for token in (ignored_tokens or [])}
 
     for _, row in dataframe.iterrows():
+        name = _clean_str(row["Name"])
+        phrases, token_set = _prepare_keywords(
+            row["Keywords"],
+            synonyms,
+            ignored_set,
+        )
+        if not token_set:
+            warnings.append(
+                f"Faculty '{name}' has missing keywords (row {int(row['__rownum__'])})."
+            )
+
         record = FacultyRecord(
-            name=_clean_str(row["Name"]),
+            name=name,
             degree=_clean_str(row["Degree"]),
             rank=_clean_str(row["Rank"]),
             division=_clean_str(row["Division"]),
             career_stage=_clean_str(row["Career Stage"]),
-            keywords=_parse_keywords(
-                row["Keywords"],
-                warnings,
-                entity="Faculty",
-                name=_clean_str(row["Name"]),
-                row_num=int(row["__rownum__"]),
-            ),
+            keywords=token_set,
+            keywords_phrases=phrases,
             raw_row_index=int(row["__rownum__"]),
         )
         records.append(record)
@@ -65,7 +79,12 @@ def load_faculty(path: Path) -> IngestionResult:
     return IngestionResult(records=records, warnings=warnings)
 
 
-def load_foundations(path: Path) -> IngestionResult:
+def load_foundations(
+    path: Path,
+    *,
+    synonyms: dict[str, list[str]] | None = None,
+    ignored_tokens: Iterable[str] | None = None,
+) -> IngestionResult:
     """Load and validate foundation spreadsheet."""
 
     dataframe = _read_excel(path)
@@ -75,23 +94,31 @@ def load_foundations(path: Path) -> IngestionResult:
 
     records: List[FoundationRecord] = []
     warnings: List[str] = []
+    synonyms = _normalize_synonyms(synonyms)
+    ignored_set = {token.lower() for token in (ignored_tokens or [])}
 
     for _, row in dataframe.iterrows():
+        name = _clean_str(row["Foundation name"])
+        phrases, token_set = _prepare_keywords(
+            row["Keywords"],
+            synonyms,
+            ignored_set,
+        )
+        if not token_set:
+            warnings.append(
+                f"Foundation '{name}' has missing keywords (row {int(row['__rownum__'])})."
+            )
+
         record = FoundationRecord(
-            name=_clean_str(row["Foundation name"]),
+            name=name,
             areas_of_funding=_clean_str(row["area(s) of funding"]),
             average_grant_amount=_clean_str(row["average grant amount"]),
             career_stage_targeted=_clean_str(row["career stage targeted"]),
             deadlines=_clean_str(row["Deadlines, restrictions"]),
             institution_preferences=_clean_str(row["institution specific preferences"]),
             website=_clean_str(row["Website link"]),
-            keywords=_parse_keywords(
-                row["Keywords"],
-                warnings,
-                entity="Foundation",
-                name=_clean_str(row["Foundation name"]),
-                row_num=int(row["__rownum__"]),
-            ),
+            keywords=token_set,
+            keywords_phrases=phrases,
             raw_row_index=int(row["__rownum__"]),
         )
         records.append(record)
@@ -151,22 +178,69 @@ def _clean_str(value: object) -> str:
     return str(value).strip()
 
 
-def _parse_keywords(
+def _normalize_synonyms(synonyms: dict[str, list[str]] | None) -> dict[str, list[str]]:
+    if not synonyms:
+        return {}
+    normalized: dict[str, list[str]] = {}
+    for key, values in synonyms.items():
+        base = _normalize_phrase(key)
+        if not base:
+            continue
+        cleaned_values = []
+        for value in values:
+            norm_value = _normalize_phrase(value)
+            if norm_value:
+                cleaned_values.append(norm_value)
+        normalized[base] = cleaned_values
+    return normalized
+
+
+def _prepare_keywords(
     raw_keywords: object,
-    warnings: List[str],
-    *,
-    entity: str,
-    name: str,
-    row_num: int,
-) -> set[str]:
+    synonyms: dict[str, list[str]],
+    ignored_tokens: set[str],
+) -> tuple[List[str], set[str]]:
     cleaned = _clean_str(raw_keywords)
     if not cleaned:
-        warnings.append(f"{entity} '{name}' has missing keywords (row {row_num}).")
-        return set()
-    tokens = {token.strip().lower() for token in cleaned.split(",") if token.strip()}
-    if not tokens:
-        warnings.append(f"{entity} '{name}' has missing keywords (row {row_num}).")
-    return tokens
+        return [], set()
+
+    phrases: set[str] = set()
+    for part in re.split(r"[;,\n]+", cleaned):
+        phrase = _normalize_phrase(part)
+        if not phrase:
+            continue
+        if _phrase_should_ignore(phrase, ignored_tokens):
+            continue
+        phrases.add(phrase)
+        for syn in synonyms.get(phrase, []):
+            if syn and not _phrase_should_ignore(syn, ignored_tokens):
+                phrases.add(syn)
+
+    sorted_phrases = sorted(phrases)
+    token_set = {
+        token
+        for phrase in sorted_phrases
+        for token in phrase.split()
+        if token not in ignored_tokens
+    }
+    return sorted_phrases, token_set
+
+
+def _normalize_phrase(value: str) -> str:
+    value = value.strip().lower()
+    value = value.replace("\u00a0", " ")
+    value = re.sub(r"[\s_/|,-]+", " ", value)
+    value = re.sub(r"[^a-z0-9 ]+", "", value)
+    return " ".join(value.split())
+
+
+def _phrase_should_ignore(phrase: str, ignored_tokens: set[str]) -> bool:
+    if not phrase:
+        return True
+    words = [part for part in phrase.split() if part]
+    if not words:
+        return True
+    return all(word in ignored_tokens for word in words)
 
 
 def _detect_duplicate_faculty(records: List[FacultyRecord]) -> List[str]:

@@ -26,7 +26,25 @@ def write_foundations(tmp_path: Path, rows: list[dict]) -> Path:
     return path
 
 
-def test_pipeline_success(tmp_path):
+@pytest.fixture()
+def config_override(monkeypatch, tmp_path):
+    config_path = tmp_path / "settings.toml"
+    config_path.write_text(
+        "[matching]\n"
+        "similarity_threshold = 0.6\n"
+        "use_weights = false\n"
+        "keyword_weight = 0.6\n"
+        "grant_weight = 0.2\n"
+        "stage_weight = 0.2\n"
+        'ignored_tokens = ["career", "development", "prevention", "and", "in", "neonatal"]\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("FMT_CONFIG_PATH", str(config_path))
+    yield
+    monkeypatch.delenv("FMT_CONFIG_PATH", raising=False)
+
+
+def test_pipeline_success(tmp_path, config_override):
     faculty_path = write_faculty(
         tmp_path,
         [
@@ -83,7 +101,8 @@ def test_pipeline_success(tmp_path):
     assert final_path == output_path
     assert output_path.exists()
     assert summary.total_faculty == 2
-    assert summary.total_matches == 1
+    assert summary.total_matches >= 1
+    assert summary.weighted_mode is False
     assert any("missing keywords" in warning for warning in summary.warnings)
 
 

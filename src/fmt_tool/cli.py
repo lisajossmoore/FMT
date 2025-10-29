@@ -21,6 +21,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
+    parser.set_defaults(use_weights=None)
     parser.add_argument(
         "--faculty-xlsx",
         required=True,
@@ -54,6 +55,18 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="ISO-formatted date string to override the run timestamp (YYYY-MM-DD).",
     )
+    parser.add_argument(
+        "--use-weights",
+        dest="use_weights",
+        action="store_true",
+        help="Blend keyword score with grant size and career-stage alignment.",
+    )
+    parser.add_argument(
+        "--no-use-weights",
+        dest="use_weights",
+        action="store_false",
+        help="Disable weighted scoring even if enabled in configuration.",
+    )
 
     return parser
 
@@ -78,6 +91,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     except Exception as exc:  # pragma: no cover - defensive
         print(f"Unexpected error: {exc}", file=sys.stderr)
         return 1
+
+    if summary.weighted_mode:
+        print("[v2.2] Weighted mode active (kw=0.6, grant=0.2, stage=0.2)")
 
     print(f"Digest created at {output_path}")
     print(
